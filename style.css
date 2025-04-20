@@ -196,6 +196,38 @@ body {
     accent-color: #4d7ea8;
 }
 
+/* Window frame color picker */
+.frame-color-presets {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.color-swatch {
+    width: 25px;
+    height: 25px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+}
+
+.color-swatch.active {
+    border-color: #ffffff;
+    transform: scale(1.1);
+}
+
+.warning-text {
+    color: #ff9800;
+    font-size: 12px;
+    margin-top: 4px;
+    font-style: italic;
+}
+
 /* Adjust the settings buttons layout */
 .settings-buttons {
     display: flex;

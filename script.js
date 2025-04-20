@@ -18,9 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Default settings
         defaults: {
             windowOpacity: 0, // Changed to 0
-            fogOpacity: 0.35,
-            fogRegenRate: 0.0005,
-            dropOpacity: 0.4,
+            fogOpacity: 0.19,
+            fogRegenRate: 0.0006,
+            dropOpacity: 0.16,
             dropSpawnRate: 0.5,
             dropMaxCount: 50,
             dropSizeMin: 2,
@@ -28,7 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
             baseSpeed: 0.05, // Halved from 0.1 to 0.05
             weightLossRate: 0.0005,
             massGainRate: 0.00015,
-            musicVolume: 0.5
+            musicVolume: 0.5,
+            cellSize: 4, // Added fog resolution (cell size)
+            frameColor: "#8B5A2B" // Default frame color
         },
         
         // Current settings (initially set to defaults)
@@ -40,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Audio control
     let isPlaying = false;
+    let musicAutoStarted = false; // Flag to track if music was auto-started
     
     function initializeAudio() {
         const musicSelector = document.getElementById('musicSelector');
@@ -104,11 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create fog map - tracks where fog has been cleared
     const fogMap = {
         cells: [],
-        cellSize: 4, // Smaller size for higher resolution (was 8)
         
         init: function() {
-            const cols = Math.ceil(canvas.width / this.cellSize);
-            const rows = Math.ceil(canvas.height / this.cellSize);
+            // Use cellSize from current settings
+            const cellSize = settings.current.cellSize;
+            const cols = Math.ceil(canvas.width / cellSize);
+            const rows = Math.ceil(canvas.height / cellSize);
             
             // Initialize all fog cells to full opacity (1.0)
             this.cells = new Array(rows);
@@ -119,9 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Clear fog at a specific position (reduce opacity)
         clearAt: function(x, y, radius, amount) {
-            const col = Math.floor(x / this.cellSize);
-            const row = Math.floor(y / this.cellSize);
-            const radiusCells = Math.ceil(radius / this.cellSize);
+            const cellSize = settings.current.cellSize;
+            const col = Math.floor(x / cellSize);
+            const row = Math.floor(y / cellSize);
+            const radiusCells = Math.ceil(radius / cellSize);
             
             // Affect a circular area around the position
             for (let r = -radiusCells; r <= radiusCells; r++) {
@@ -148,8 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Get fog density at a specific position
         getDensityAt: function(x, y) {
-            const col = Math.floor(x / this.cellSize);
-            const row = Math.floor(y / this.cellSize);
+            const cellSize = settings.current.cellSize;
+            const col = Math.floor(x / cellSize);
+            const row = Math.floor(y / cellSize);
             
             // Return 0 if outside boundaries
             if (row < 0 || row >= this.cells.length || 
@@ -176,6 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Draw the fog layer with smoothing effect
         draw: function(ctx) {
+            const cellSize = settings.current.cellSize;
+            
             // First clear the canvas to be fully transparent
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -193,10 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Use the current fog opacity from settings
                         offCtx.fillStyle = `rgba(200, 220, 240, ${settings.current.fogOpacity * opacity})`;
                         offCtx.fillRect(
-                            x * this.cellSize, 
-                            y * this.cellSize, 
-                            this.cellSize, 
-                            this.cellSize
+                            x * cellSize, 
+                            y * cellSize, 
+                            cellSize, 
+                            cellSize
                         );
                     }
                 }
@@ -585,6 +593,16 @@ document.addEventListener('DOMContentLoaded', () => {
         rainSystem.start();
     }
     
+    // Function to update window frame color
+    function updateFrameColor(color) {
+        const windowFrame = document.querySelector('.window-frame');
+        if (windowFrame) {
+            windowFrame.style.backgroundColor = color;
+            windowFrame.style.borderColor = color;
+            settings.current.frameColor = color;
+        }
+    }
+    
     // Settings panel functionality
     function initializeSettingsPanel() {
         const panel = document.querySelector('.settings-panel');
@@ -619,8 +637,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (settingName === 'windowOpacity') {
                     updateWindowOpacity();
                 }
+                
+                // Restart the simulation with new cell size if that's what changed
+                if (settingName === 'cellSize') {
+                    startSimulation();
+                }
             });
         });
+        
+        // Initialize frame color swatches
+        const colorSwatches = document.querySelectorAll('.color-swatch');
+        
+        // Mark the active color
+        for (const swatch of colorSwatches) {
+            if (swatch.dataset.color === settings.current.frameColor) {
+                swatch.classList.add('active');
+            }
+            
+            swatch.addEventListener('click', () => {
+                // Remove active class from all swatches
+                colorSwatches.forEach(s => s.classList.remove('active'));
+                // Add active class to clicked swatch
+                swatch.classList.add('active');
+                // Update frame color
+                updateFrameColor(swatch.dataset.color);
+            });
+        }
+        
+        // Initialize the frame color
+        updateFrameColor(settings.current.frameColor);
         
         // Reset button resets all settings to defaults
         resetButton.addEventListener('click', () => {
@@ -638,11 +683,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update window opacity
             updateWindowOpacity();
             
+            // Update frame color
+            updateFrameColor(settings.current.frameColor);
+            
+            // Update color swatch selection
+            colorSwatches.forEach(swatch => {
+                swatch.classList.toggle('active', swatch.dataset.color === settings.current.frameColor);
+            });
+            
             // Update volume
             if (audio) {
                 audio.volume = settings.current.musicVolume;
                 document.getElementById('volumeControl').value = settings.current.musicVolume;
             }
+            
+            // Restart simulation with new settings
+            startSimulation();
         });
         
         // Refresh button restarts the simulation with current settings
@@ -682,10 +738,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-play the first song if possible
     audio.play().then(() => {
         isPlaying = true;
+        musicAutoStarted = true;
         document.getElementById('playIcon').style.display = 'none';
         document.getElementById('pauseIcon').style.display = 'inline';
     }).catch(error => {
         console.log('Auto-play prevented by browser. Click play to start music.');
+        // Try to work around autoplay restrictions when user interacts with the page
+        window.addEventListener('click', function autoStartMusic() {
+            if (!musicAutoStarted) {
+                audio.play().then(() => {
+                    isPlaying = true;
+                    musicAutoStarted = true;
+                    document.getElementById('playIcon').style.display = 'none';
+                    document.getElementById('pauseIcon').style.display = 'inline';
+                    window.removeEventListener('click', autoStartMusic);
+                }).catch(e => {
+                    console.error('Still could not auto-play music after user interaction');
+                });
+            }
+        });
     });
     
     // Add click effect to create new raindrops

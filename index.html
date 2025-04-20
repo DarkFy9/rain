@@ -44,19 +44,36 @@
                     <input type="range" id="windowOpacity" min="0" max="1" step="0.01" value="0">
                     <span class="value-display">0</span>
                 </div>
+                <div class="setting">
+                    <label for="frameColor">Frame Color:</label>
+                    <div class="frame-color-presets">
+                        <span class="color-swatch" data-color="#8B5A2B" style="background-color: #8B5A2B;"></span>
+                        <span class="color-swatch" data-color="#654321" style="background-color: #654321;"></span>
+                        <span class="color-swatch" data-color="#5D4037" style="background-color: #5D4037;"></span>
+                        <span class="color-swatch" data-color="#4E342E" style="background-color: #4E342E;"></span>
+                        <span class="color-swatch" data-color="#3E2723" style="background-color: #3E2723;"></span>
+                        <span class="color-swatch" data-color="#000000" style="background-color: #000000;"></span>
+                    </div>
+                </div>
             </div>
             
             <div class="settings-group">
                 <h4>Fog</h4>
                 <div class="setting">
                     <label for="fogOpacity">Fog Opacity:</label>
-                    <input type="range" id="fogOpacity" min="0" max="1" step="0.01" value="0.35">
-                    <span class="value-display">0.35</span>
+                    <input type="range" id="fogOpacity" min="0" max="1" step="0.01" value="0.19">
+                    <span class="value-display">0.19</span>
                 </div>
                 <div class="setting">
                     <label for="fogRegenRate">Regeneration Rate:</label>
-                    <input type="range" id="fogRegenRate" min="0.0001" max="0.001" step="0.0001" value="0.0005">
-                    <span class="value-display">0.0005</span>
+                    <input type="range" id="fogRegenRate" min="0.0001" max="0.001" step="0.0001" value="0.0006">
+                    <span class="value-display">0.0006</span>
+                </div>
+                <div class="setting">
+                    <label for="cellSize">Fog Resolution (Experimental):</label>
+                    <input type="range" id="cellSize" min="2" max="10" step="1" value="4">
+                    <span class="value-display">4</span>
+                    <div class="warning-text">Warning: Lower values may impact performance</div>
                 </div>
             </div>
             
@@ -64,8 +81,8 @@
                 <h4>Raindrops</h4>
                 <div class="setting">
                     <label for="dropOpacity">Opacity:</label>
-                    <input type="range" id="dropOpacity" min="0" max="1" step="0.01" value="0.4">
-                    <span class="value-display">0.4</span>
+                    <input type="range" id="dropOpacity" min="0" max="1" step="0.01" value="0.16">
+                    <span class="value-display">0.16</span>
                 </div>
                 <div class="setting">
                     <label for="dropSpawnRate">Spawn Rate:</label>
