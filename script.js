@@ -32,8 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
             cellSize: 3, // Fog resolution (cell size)
             frameColor: "#5D4037", // Default frame color
             trailFadeSpeed: 0.18, // Speed at which stagnant trails fade (0-1)
+            endTrailFadeSpeed: 0.9, // Speed at which end trails fade when drop hits boundary (0-1)
             minActiveSize: 0.6, // Minimum size for a drop to remain active while falling
-            trailOpacityRatio: 0.7 // Opacity of trails relative to the drop (0-1)
+            trailOpacityRatio: 0.7, // Opacity of trails relative to the drop (0-1)
+            trailBlur: 0.5, // Amount of blur/blending for trails (0-1)
+            surfaceTensionFactor: 0.7, // Surface tension strength (0-1, higher = more circular)
+            rotationDamping: 0.7, // Damping factor for rotation (0-1, higher = less rotation)
+            bottomWeighting: 0.3, // How much drops are elongated at the bottom (0-1)
+            collisionDistance: 1.2, // Multiplier for collision detection distance (0.8-2)
+            backgroundRainIntensity: 0.5, // Intensity of background rain (0-1)
+            backgroundRainOpacity: 0.6, // Opacity of background rain (0-1)
+            enableRefraction: true, // Light refraction effect
+            enableSurfaceTension: false, // Dynamic surface tension effect
+            enableBackgroundRain: true // Background rain effect
         },
         
         // Current settings (initially set to defaults)
@@ -292,6 +303,14 @@ document.addEventListener('DOMContentLoaded', () => {
             this.massGainRate = settings.current.massGainRate; // Rate at which drops gain mass from fog
             this.reachedBoundary = false; // Flag to indicate if drop has reached the boundary
             this.isFading = false; // Flag to indicate if drop is in fading phase
+            
+            // For dynamic surface tension
+            this.wobblePhase = Math.random() * Math.PI * 2; // Random starting phase for wobble
+            this.wobbleFrequency = 0.1 + Math.random() * 0.2; // Frequency of wobble
+            this.wobbleAmplitude = 0; // Current amplitude of wobble (0-1)
+            this.targetWobble = 0; // Target wobble amplitude
+            this.dropShape = []; // Points defining the shape of the drop for surface tension
+            this.previousSpeed = this.speed; // To detect acceleration
         }
         
         update() {
@@ -311,12 +330,16 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Handle fading drops (either too small or reached boundary)
             if (this.isFading) {
-                // Fade trail faster (5x faster than before)
-                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 15) {
+                // Fade trail faster (5x faster than before * 1.2)
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 18) {
                     const lostTrail = this.trail.pop();
                     fogMap.addFog(lostTrail.x, lostTrail.y, this.size, 0.02);
                 } else if (this.trail.length === 0) {
-                    this.active = false; // Deactivate once trail is gone
+                    // Gradually fade to fully transparent before deactivating
+                    this.opacity *= settings.current.endTrailFadeSpeed;
+                    if (this.opacity < 0.01) {
+                        this.active = false; // Deactivate once trail is gone and drop is invisible
+                    }
                 }
                 return;
             }
@@ -335,8 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 
-                // When stuck, slowly dissipate trails into fog (1.5x faster than before)
-                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 3) {
+                // When stuck, slowly dissipate trails into fog (1.5x faster than before * 2)
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 6) {
                     const lostTrail = this.trail.pop();
                     // Add to fog where the trail disappeared
                     fogMap.addFog(lostTrail.x, lostTrail.y, this.size * 0.5, 0.01);
@@ -365,8 +388,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 
-                // Slowly dissipate trails from non-moving drops into fog (1.5x faster than before)
-                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 1.5) {
+                // Slowly dissipate trails from non-moving drops into fog (1.5x faster than before * 2)
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 3) {
                     const lostTrail = this.trail.pop();
                     // Add to fog where the trail disappeared
                     fogMap.addFog(lostTrail.x, lostTrail.y, this.size * 0.5, 0.01);
@@ -448,6 +471,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.stuckTime = this.stuckDuration;
                 this.speed = this.baseSpeed; // Reset speed when unstuck
             }
+            
+            // Handle surface tension effects when enabled
+            if (settings.current.enableSurfaceTension && this.moving) {
+                // Update wobble based on acceleration and direction changes
+                const currentSpeed = Math.sqrt(this.speed * this.speed + this.xMomentum * this.xMomentum);
+                const acceleration = Math.abs(currentSpeed - this.previousSpeed);
+                
+                // Increase wobble with acceleration and when direction changes
+                if (acceleration > 0.01 || Math.abs(this.xMomentum) > 0.1) {
+                    this.targetWobble = Math.min(0.5, this.targetWobble + acceleration * 5);
+                } else {
+                    // Gradually reduce wobble when moving steadily
+                    this.targetWobble *= 0.95;
+                }
+                
+                // Calculate current movement direction angle
+                const moveAngle = Math.atan2(this.speed, this.xMomentum);
+                
+                // Smooth transition to target wobble
+                this.wobbleAmplitude = this.wobbleAmplitude * 0.9 + this.targetWobble * 0.1;
+                
+                // Adjust wobble phase to align with movement direction
+                // This creates a bias that rotates the drop to align with movement
+                if (currentSpeed > 0.05) {
+                    // Get current phase normalized to 0-2π range
+                    const normalizedPhase = this.wobblePhase % (Math.PI * 2);
+                    
+                    // Calculate optimal phase for movement direction (perpendicular to movement)
+                    // This makes the longest axis of the drop align with movement
+                    const targetPhase = moveAngle + Math.PI/2;
+                    
+                    // Calculate shortest distance to target phase considering circular nature
+                    let phaseDiff = targetPhase - normalizedPhase;
+                    while (phaseDiff > Math.PI) phaseDiff -= Math.PI * 2;
+                    while (phaseDiff < -Math.PI) phaseDiff += Math.PI * 2;
+                    
+                    // Apply corrective rotation based on direction and speed
+                    // Faster movement = stronger correction
+                    const correctionStrength = Math.min(0.02, currentSpeed * 0.01);
+                    this.wobblePhase += phaseDiff * correctionStrength;
+                } else {
+                    // Normal wobble animation when moving slowly
+                    this.wobblePhase += this.wobbleFrequency * (1 - settings.current.rotationDamping);
+                }
+                
+                this.previousSpeed = currentSpeed;
+            } else {
+                this.wobbleAmplitude = 0;
+            }
         }
         
         draw(ctx) {
@@ -456,6 +528,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Draw trail
             if (this.trail.length > 1) {
                 ctx.beginPath();
+                
+                // Apply blur effect when enabled
+                const blurAmount = settings.current.trailBlur * 3; // 0-3px blur
+                if (blurAmount > 0) {
+                    ctx.filter = `blur(${blurAmount}px)`;
+                }
                 
                 // Draw trail with gradient opacity and decreasing width
                 for (let i = 0; i < this.trail.length - 1; i++) {
@@ -474,13 +552,152 @@ document.addEventListener('DOMContentLoaded', () => {
                     ctx.lineTo(nextPoint.x, nextPoint.y);
                     ctx.stroke();
                 }
+                
+                // Reset blur filter
+                if (blurAmount > 0) {
+                    ctx.filter = 'none';
+                }
             }
             
-            // Draw raindrop head
+            // Apply light refraction effect
+            if (settings.current.enableRefraction && this.size > 1.5) {
+                // Create a clipping region for the raindrop
+                ctx.save();
+                ctx.beginPath();
+                
+                if (settings.current.enableSurfaceTension && this.wobbleAmplitude > 0.01) {
+                    // Draw a wobbling drop shape
+                    this.drawDynamicDropShape(ctx);
+                } else {
+                    // Draw a simple circle
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                }
+                
+                ctx.closePath();
+                ctx.clip();
+                
+                // Calculate refraction strength based on drop size
+                const refractionStrength = Math.min(3, this.size / 3);
+                
+                // Draw distorted background image inside the clipping region
+                const bgImage = windowGlass.style.backgroundImage;
+                if (bgImage) {
+                    // Get the background image dimensions
+                    const bgWidth = windowGlass.clientWidth;
+                    const bgHeight = windowGlass.clientHeight;
+                    
+                    // Create magnification effect
+                    ctx.drawImage(
+                        canvas, 
+                        this.x - this.size * (1 + refractionStrength * 0.5), 
+                        this.y - this.size * (1 + refractionStrength * 0.5),
+                        this.size * 2 * (1 + refractionStrength * 0.5),
+                        this.size * 2 * (1 + refractionStrength * 0.5),
+                        this.x - this.size,
+                        this.y - this.size,
+                        this.size * 2,
+                        this.size * 2
+                    );
+                }
+                
+                // Add a subtle highlight
+                const gradient = ctx.createRadialGradient(
+                    this.x - this.size * 0.3, 
+                    this.y - this.size * 0.3, 
+                    0,
+                    this.x, 
+                    this.y, 
+                    this.size
+                );
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${this.opacity * 0.7})`);
+                gradient.addColorStop(1, `rgba(220, 240, 255, ${this.opacity * 0.1})`);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.restore();
+            } else {
+                // Draw regular raindrop head
+                ctx.beginPath();
+                
+                if (settings.current.enableSurfaceTension && this.wobbleAmplitude > 0.01) {
+                    // Draw a wobbling drop shape
+                    this.drawDynamicDropShape(ctx);
+                } else {
+                    // Draw a simple circle
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                }
+                
+                ctx.fillStyle = `rgba(220, 240, 255, ${this.opacity})`;
+                ctx.fill();
+            }
+        }
+        
+        // Draw a dynamic drop shape with surface tension effects
+        drawDynamicDropShape(ctx) {
+            const numPoints = 12;
+            const angleStep = (Math.PI * 2) / numPoints;
+            const tensionFactor = settings.current.surfaceTensionFactor;
+            const rotationDamping = settings.current.rotationDamping;
+            const bottomWeighting = settings.current.bottomWeighting;
+            
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(220, 240, 255, ${this.opacity})`;
-            ctx.fill();
+            
+            // Calculate movement direction for directional stretching
+            const moveAngle = Math.atan2(this.speed, this.xMomentum);
+            const currentSpeed = Math.sqrt(this.speed * this.speed + this.xMomentum * this.xMomentum);
+            
+            // Determine strength of directional effects based on speed
+            const directionalBias = Math.min(1, currentSpeed / this.maxSpeed) * (1 - tensionFactor * 0.5);
+            
+            for (let i = 0; i < numPoints; i++) {
+                const angle = i * angleStep;
+                // Scale wobble effect by inverse of tension factor (higher tension = less wobble)
+                const wobbleEffect = Math.sin(angle * 2 + this.wobblePhase) * this.wobbleAmplitude * (1 - tensionFactor * 0.5);
+                
+                // Calculate alignment with movement direction (0 = perpendicular, 1 = aligned)
+                const alignmentWithMovement = Math.abs(Math.cos(angle - moveAngle));
+                
+                // Calculate directional stretching based on movement
+                let stretchFactor = 1.0;
+                if (this.moving && currentSpeed > 0.05) {
+                    // Enhance stretching in the direction of movement
+                    // Points aligned with movement direction get stretched more
+                    const movementStretch = 0.3 * directionalBias * alignmentWithMovement;
+                    
+                    // Apply stronger stretching in the movement direction
+                    // cosine gives maximum value at angle = moveAngle (aligned with movement)
+                    stretchFactor = 1.0 + movementStretch;
+                }
+                
+                // Add bottom weighting to make drops teardrop shaped
+                // Only when moving slowly or stationary
+                if (currentSpeed < 0.1) {
+                    const isBottomHalf = angle > 0 && angle < Math.PI;
+                    if (isBottomHalf) {
+                        // Strongest effect at the very bottom (PI/2)
+                        const bottomEffect = Math.sin(angle) * bottomWeighting * 0.5;
+                        stretchFactor += bottomEffect;
+                    }
+                }
+                
+                // Add some randomness to the wobble, reduced by tension factor
+                const randomWobble = (Math.sin(angle * 3 + this.wobblePhase * 1.5) * 
+                                     this.wobbleAmplitude * 0.3 * (1 - tensionFactor * 0.5));
+                
+                // Calculate the radius with wobble effect
+                const radius = this.size * (1 + wobbleEffect + randomWobble) * stretchFactor;
+                
+                const x = this.x + Math.cos(angle) * radius;
+                const y = this.y + Math.sin(angle) * radius;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.closePath();
         }
         
         // Check collision with another raindrop
@@ -492,7 +709,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             // If drops are close enough, they collide
-            return distance < (this.size + otherDrop.size);
+            // Use collision distance multiplier to adjust how easily drops combine
+            return distance < (this.size + otherDrop.size) * settings.current.collisionDistance;
         }
         
         // Merge with another raindrop
@@ -532,6 +750,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // Spatial partitioning grid for efficient collision detection
+    class SpatialGrid {
+        constructor(width, height, cellSize) {
+            this.cellSize = cellSize;
+            this.cols = Math.ceil(width / cellSize);
+            this.rows = Math.ceil(height / cellSize);
+            this.grid = new Array(this.rows);
+            
+            // Initialize empty grid
+            for (let y = 0; y < this.rows; y++) {
+                this.grid[y] = new Array(this.cols);
+                for (let x = 0; x < this.cols; x++) {
+                    this.grid[y][x] = [];
+                }
+            }
+        }
+        
+        // Clear the grid
+        clear() {
+            for (let y = 0; y < this.rows; y++) {
+                for (let x = 0; x < this.cols; x++) {
+                    this.grid[y][x] = [];
+                }
+            }
+        }
+        
+        // Get the cell coordinates for a position
+        getCellCoords(x, y) {
+            const col = Math.floor(x / this.cellSize);
+            const row = Math.floor(y / this.cellSize);
+            return { row: Math.min(Math.max(row, 0), this.rows - 1), col: Math.min(Math.max(col, 0), this.cols - 1) };
+        }
+        
+        // Add an object to the appropriate cell
+        insert(obj) {
+            const { row, col } = this.getCellCoords(obj.x, obj.y);
+            this.grid[row][col].push(obj);
+        }
+        
+        // Get all objects in cells surrounding a position (including the cell itself)
+        getNearbyObjects(x, y, radius) {
+            const results = [];
+            
+            // Calculate the range of cells to check
+            const startCell = this.getCellCoords(x - radius, y - radius);
+            const endCell = this.getCellCoords(x + radius, y + radius);
+            
+            // Collect objects from all cells in range
+            for (let row = startCell.row; row <= endCell.row; row++) {
+                for (let col = startCell.col; col <= endCell.col; col++) {
+                    results.push(...this.grid[row][col]);
+                }
+            }
+            
+            return results;
+        }
+    }
+    
     // Rain system
     class RainSystem {
         constructor() {
@@ -539,6 +815,9 @@ document.addEventListener('DOMContentLoaded', () => {
             this.lastFrameTime = 0;
             this.frameInterval = 1000 / 60; // Target 60 FPS
             this.isRunning = true;
+            
+            // Initialize spatial grid for collision detection
+            this.spatialGrid = new SpatialGrid(canvas.width, canvas.height, 30); // Cell size of 30px
         }
         
         update() {
@@ -583,17 +862,37 @@ document.addEventListener('DOMContentLoaded', () => {
                             drop.opacity = settings.current.fogOpacity; // Set opacity to fog opacity
                         }
                     }
+                }
+            }
+            
+            // Clear spatial grid before re-populating
+            this.spatialGrid.clear();
+            
+            // Insert active drops into spatial grid
+            for (const drop of this.raindrops) {
+                if (drop.active && !drop.isFading) {
+                    this.spatialGrid.insert(drop);
+                }
+            }
+            
+            // Handle collisions using spatial partitioning
+            for (const drop of this.raindrops) {
+                if (!drop.active || drop.isFading) continue;
+                
+                // Get nearby drops
+                const nearbyDrops = this.spatialGrid.getNearbyObjects(drop.x, drop.y, drop.size * 3);
+                
+                // Check collisions with nearby drops only
+                for (const otherDrop of nearbyDrops) {
+                    // Skip self-collision
+                    if (drop === otherDrop) continue;
                     
-                    // Check collisions with other drops
-                    for (let j = i + 1; j < this.raindrops.length; j++) {
-                        const otherDrop = this.raindrops[j];
-                        if (drop.active && otherDrop.active && drop.checkCollision(otherDrop)) {
-                            // Always merge into the larger drop
-                            if (drop.mass >= otherDrop.mass) {
-                                drop.merge(otherDrop);
-                            } else {
-                                otherDrop.merge(drop);
-                            }
+                    if (drop.active && otherDrop.active && drop.checkCollision(otherDrop)) {
+                        // Always merge into the larger drop
+                        if (drop.mass >= otherDrop.mass) {
+                            drop.merge(otherDrop);
+                        } else {
+                            otherDrop.merge(drop);
                         }
                     }
                 }
@@ -647,6 +946,148 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // FPS counter implementation
+    let frameCount = 0;
+    let lastFpsUpdateTime = 0;
+    let currentFps = 0;
+    
+    function updateFpsCounter(timestamp) {
+        // Count frames
+        frameCount++;
+        
+        // Update FPS display every 500ms
+        if (timestamp - lastFpsUpdateTime >= 500) {
+            // Calculate FPS: frames / seconds
+            currentFps = Math.round(frameCount / ((timestamp - lastFpsUpdateTime) / 1000));
+            
+            // Update display
+            const fpsCounter = document.getElementById('fpsCounter');
+            if (fpsCounter) {
+                fpsCounter.textContent = `FPS: ${currentFps}`;
+                
+                // Add color coding for performance
+                if (currentFps > 45) {
+                    fpsCounter.style.color = '#4CAF50'; // Green for good performance
+                } else if (currentFps > 30) {
+                    fpsCounter.style.color = '#FFC107'; // Yellow for moderate performance
+                } else {
+                    fpsCounter.style.color = '#F44336'; // Red for poor performance
+                }
+            }
+            
+            // Reset counter
+            frameCount = 0;
+            lastFpsUpdateTime = timestamp;
+        }
+        
+        // Request next frame
+        requestAnimationFrame(updateFpsCounter);
+    }
+    
+    // Start FPS monitoring
+    requestAnimationFrame(updateFpsCounter);
+    
+    // Function to create background rain effect
+    function createBackgroundRain() {
+        const container = document.getElementById('backgroundRain');
+        const intensity = settings.current.backgroundRainIntensity;
+        const opacity = settings.current.backgroundRainOpacity;
+        const enabled = settings.current.enableBackgroundRain;
+        
+        // Clear the container
+        container.innerHTML = '';
+        
+        if (!enabled) {
+            return;
+        }
+        
+        // Calculate drops based on intensity
+        const baseDrops = Math.floor(30 + intensity * 70); // 30-100 drops initially
+        
+        // Function to create a single raindrop element
+        function createRaindrop() {
+            const drop = document.createElement('div');
+            drop.className = 'rain-drop';
+            
+            // Random positioning
+            const xPos = Math.random() * 100; // percentage across the screen
+            const yPos = -30 - Math.random() * 20; // start above viewport
+            const delay = Math.random() * 2; // seconds of delay
+            const duration = 0.5 + Math.random() * (1 - intensity) * 1.5; // 0.5-2s, faster with higher intensity
+            const height = 10 + Math.random() * 15; // 10-25 pixels
+            const dropOpacity = (0.1 + Math.random() * 0.3) * opacity; // Apply the opacity setting
+            
+            // Apply styles
+            drop.style.left = `${xPos}%`;
+            drop.style.top = `${yPos}px`;
+            drop.style.height = `${height}px`;
+            drop.style.opacity = dropOpacity;
+            drop.style.animationDelay = `${delay}s`;
+            drop.style.animationDuration = `${duration}s`;
+            
+            // Add to container
+            container.appendChild(drop);
+            
+            // Remove after animation completes (as a backup, though we're using infinite now)
+            setTimeout(() => {
+                if (drop.parentNode === container) {
+                    drop.remove();
+                }
+            }, (duration + delay) * 1000 + 1000);
+        }
+        
+        // Create initial batch of drops
+        for (let i = 0; i < baseDrops; i++) {
+            createRaindrop();
+        }
+        
+        // Continuously add new drops if rain is enabled
+        if (enabled) {
+            let raindropInterval = setInterval(() => {
+                // Only continue if rain is still enabled
+                if (!settings.current.enableBackgroundRain) {
+                    clearInterval(raindropInterval);
+                    return;
+                }
+                
+                // Add a few new drops at regular intervals for continuous effect
+                const newDropCount = Math.ceil(1 + intensity * 5); // 1-6 drops
+                for (let i = 0; i < newDropCount; i++) {
+                    createRaindrop();
+                }
+                
+                // Clean up excess drops if there are too many (performance)
+                if (container.children.length > 300) {
+                    while (container.children.length > 200) {
+                        container.removeChild(container.firstChild);
+                    }
+                }
+            }, 200); // Add new drops every 200ms
+        }
+    }
+    
+    // Initialize umbrella toggle button
+    function initializeUmbrellaToggle() {
+        const toggleButton = document.getElementById('umbrella-toggle');
+        
+        // Set initial state
+        if (settings.current.enableBackgroundRain) {
+            toggleButton.classList.add('active');
+        }
+        
+        // Add click handler
+        toggleButton.addEventListener('click', () => {
+            // Toggle the background rain setting
+            settings.current.enableBackgroundRain = !settings.current.enableBackgroundRain;
+            
+            // Update the button state
+            toggleButton.classList.toggle('active', settings.current.enableBackgroundRain);
+            
+            // Update the rain effect
+            createBackgroundRain();
+        });
+    }
+    
     // Function to start the simulation
     function startSimulation() {
         // Stop existing simulation if it exists
@@ -656,6 +1097,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update window opacity
         updateWindowOpacity();
+        
+        // Create background rain
+        createBackgroundRain();
         
         // Create and start a new rain system
         rainSystem = new RainSystem();
@@ -685,6 +1129,24 @@ document.addEventListener('DOMContentLoaded', () => {
             panel.classList.toggle('open');
         });
         
+        // Make settings groups collapsible
+        const groupHeaders = document.querySelectorAll('.group-header');
+        
+        groupHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                // Toggle active class
+                header.classList.toggle('active');
+                
+                // Toggle content visibility
+                const content = header.nextElementSibling;
+                if (header.classList.contains('active')) {
+                    content.style.display = 'block';
+                } else {
+                    content.style.display = 'none';
+                }
+            });
+        });
+        
         // Initialize all sliders with current values
         const sliders = document.querySelectorAll('.setting input[type="range"]');
         
@@ -711,6 +1173,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (settingName === 'cellSize') {
                     startSimulation();
                 }
+                
+                // Update background rain if intensity changed
+                if (settingName === 'backgroundRainIntensity' || settingName === 'backgroundRainOpacity') {
+                    createBackgroundRain();
+                }
+            });
+        });
+        
+        // Initialize checkboxes
+        const checkboxes = document.querySelectorAll('.setting input[type="checkbox"]');
+        
+        checkboxes.forEach(checkbox => {
+            const settingName = checkbox.id;
+            
+            // Set initial value from settings
+            checkbox.checked = settings.current[settingName];
+            
+            // Update setting when checkbox changes
+            checkbox.addEventListener('change', () => {
+                settings.current[settingName] = checkbox.checked;
             });
         });
         
@@ -747,6 +1229,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 slider.value = settings.current[settingName];
                 valueDisplay.textContent = settings.current[settingName].toFixed(4);
+            });
+            
+            // Update all checkboxes with default values
+            checkboxes.forEach(checkbox => {
+                const settingName = checkbox.id;
+                checkbox.checked = settings.current[settingName];
             });
             
             // Update window opacity
@@ -800,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize settings panel and audio
     initializeSettingsPanel();
     initializeAudio();
+    initializeUmbrellaToggle();
     
     // Start the simulation
     startSimulation();

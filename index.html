@@ -5,14 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rainy Window Simulation</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <div class="window-frame">
             <div class="window-glass">
                 <canvas id="rainCanvas"></canvas>
+                <div id="backgroundRain" class="background-rain"></div>
             </div>
         </div>
+    </div>
+    
+    <div id="umbrella-toggle" class="umbrella-toggle">
+        <i class="fas fa-umbrella"></i>
     </div>
     
     <div class="settings-panel">
@@ -20,124 +26,197 @@
         <div class="settings-content">
             <h3>Settings</h3>
             
+            <div class="performance-stats">
+                <span id="fpsCounter">FPS: --</span>
+            </div>
+            
             <div class="settings-group">
-                <h4>Music</h4>
-                <div class="music-controls">
-                    <select id="musicSelector">
-                        <option value="backgroundMusic/rain-music1.mp3">Rain Music 1</option>
-                        <option value="backgroundMusic/rain-music2.mp3">Rain Music 2</option>
-                    </select>
-                    <div class="music-buttons">
-                        <button id="playPauseMusic">
-                            <span id="playIcon">▶</span>
-                            <span id="pauseIcon" style="display:none;">❚❚</span>
-                        </button>
-                        <input type="range" id="volumeControl" min="0" max="1" step="0.05" value="0.5">
+                <h4 class="group-header active">Music</h4>
+                <div class="settings-group-content">
+                    <div class="music-controls">
+                        <select id="musicSelector">
+                            <option value="backgroundMusic/rain-music1.mp3">Rain Music 1</option>
+                            <option value="backgroundMusic/rain-music2.mp3">Rain Music 2</option>
+                        </select>
+                        <div class="music-buttons">
+                            <button id="playPauseMusic">
+                                <span id="playIcon">▶</span>
+                                <span id="pauseIcon" style="display:none;">❚❚</span>
+                            </button>
+                            <input type="range" id="volumeControl" min="0" max="1" step="0.05" value="0.5">
+                        </div>
                     </div>
                 </div>
             </div>
             
             <div class="settings-group">
-                <h4>Window</h4>
-                <div class="setting">
-                    <label for="windowOpacity">Window Opacity:</label>
-                    <input type="range" id="windowOpacity" min="0" max="1" step="0.01" value="0">
-                    <span class="value-display">0</span>
-                </div>
-                <div class="setting">
-                    <label for="frameColor">Frame Color:</label>
-                    <div class="frame-color-presets">
-                        <span class="color-swatch" data-color="#8B5A2B" style="background-color: #8B5A2B;"></span>
-                        <span class="color-swatch" data-color="#654321" style="background-color: #654321;"></span>
-                        <span class="color-swatch" data-color="#5D4037" style="background-color: #5D4037;"></span>
-                        <span class="color-swatch" data-color="#4E342E" style="background-color: #4E342E;"></span>
-                        <span class="color-swatch" data-color="#3E2723" style="background-color: #3E2723;"></span>
-                        <span class="color-swatch" data-color="#000000" style="background-color: #000000;"></span>
+                <h4 class="group-header active">Window</h4>
+                <div class="settings-group-content">
+                    <div class="setting">
+                        <label for="windowOpacity">Window Opacity:</label>
+                        <input type="range" id="windowOpacity" min="0" max="1" step="0.01" value="0">
+                        <span class="value-display">0</span>
+                    </div>
+                    <div class="setting">
+                        <label for="frameColor">Frame Color:</label>
+                        <div class="frame-color-presets">
+                            <span class="color-swatch" data-color="#8B5A2B" style="background-color: #8B5A2B;"></span>
+                            <span class="color-swatch" data-color="#654321" style="background-color: #654321;"></span>
+                            <span class="color-swatch" data-color="#5D4037" style="background-color: #5D4037;"></span>
+                            <span class="color-swatch" data-color="#4E342E" style="background-color: #4E342E;"></span>
+                            <span class="color-swatch" data-color="#3E2723" style="background-color: #3E2723;"></span>
+                            <span class="color-swatch" data-color="#000000" style="background-color: #000000;"></span>
+                        </div>
+                    </div>
+                    <div class="setting">
+                        <label for="backgroundRainIntensity">Background Rain Intensity:</label>
+                        <input type="range" id="backgroundRainIntensity" min="0" max="1" step="0.1" value="0.5">
+                        <span class="value-display">0.5</span>
+                    </div>
+                    <div class="setting">
+                        <label for="backgroundRainOpacity">Background Rain Opacity:</label>
+                        <input type="range" id="backgroundRainOpacity" min="0.1" max="1" step="0.05" value="0.6">
+                        <span class="value-display">0.6</span>
                     </div>
                 </div>
             </div>
             
             <div class="settings-group">
-                <h4>Fog</h4>
-                <div class="setting">
-                    <label for="fogOpacity">Fog Opacity:</label>
-                    <input type="range" id="fogOpacity" min="0" max="1" step="0.01" value="0.19">
-                    <span class="value-display">0.19</span>
-                </div>
-                <div class="setting">
-                    <label for="fogRegenRate">Regeneration Rate:</label>
-                    <input type="range" id="fogRegenRate" min="0.0001" max="0.001" step="0.0001" value="0.0006">
-                    <span class="value-display">0.0006</span>
-                </div>
-                <div class="setting">
-                    <label for="cellSize">Fog Resolution (Experimental):</label>
-                    <input type="range" id="cellSize" min="2" max="10" step="1" value="3">
-                    <span class="value-display">3</span>
-                    <div class="warning-text">Warning: Lower values may impact performance</div>
-                </div>
-            </div>
-            
-            <div class="settings-group">
-                <h4>Raindrops</h4>
-                <div class="setting">
-                    <label for="dropOpacity">Opacity:</label>
-                    <input type="range" id="dropOpacity" min="0" max="1" step="0.01" value="0.16">
-                    <span class="value-display">0.16</span>
-                </div>
-                <div class="setting">
-                    <label for="trailOpacityRatio">Trail Opacity:</label>
-                    <input type="range" id="trailOpacityRatio" min="0" max="1" step="0.05" value="0.7">
-                    <span class="value-display">0.7</span>
-                </div>
-                <div class="setting">
-                    <label for="trailFadeSpeed">Trail Fade Speed:</label>
-                    <input type="range" id="trailFadeSpeed" min="0.01" max="0.5" step="0.01" value="0.18">
-                    <span class="value-display">0.18</span>
-                </div>
-                <div class="setting">
-                    <label for="dropSpawnRate">Spawn Rate:</label>
-                    <input type="range" id="dropSpawnRate" min="0.1" max="2" step="0.1" value="0.5">
-                    <span class="value-display">0.5</span>
-                </div>
-                <div class="setting">
-                    <label for="dropMaxCount">Max Count:</label>
-                    <input type="range" id="dropMaxCount" min="10" max="200" step="10" value="50">
-                    <span class="value-display">50</span>
-                </div>
-                <div class="setting">
-                    <label for="dropSizeMin">Min Size:</label>
-                    <input type="range" id="dropSizeMin" min="0.5" max="5" step="0.5" value="2">
-                    <span class="value-display">2</span>
-                </div>
-                <div class="setting">
-                    <label for="minActiveSize">Min Active Size:</label>
-                    <input type="range" id="minActiveSize" min="0.1" max="2" step="0.1" value="0.6">
-                    <span class="value-display">0.6</span>
-                    <div class="warning-text">Drops smaller than this will stop moving and fade</div>
-                </div>
-                <div class="setting">
-                    <label for="dropSizeMax">Max Size:</label>
-                    <input type="range" id="dropSizeMax" min="1" max="10" step="0.5" value="6">
-                    <span class="value-display">6</span>
+                <h4 class="group-header">Fog</h4>
+                <div class="settings-group-content" style="display: none;">
+                    <div class="setting">
+                        <label for="fogOpacity">Fog Opacity:</label>
+                        <input type="range" id="fogOpacity" min="0" max="1" step="0.01" value="0.19">
+                        <span class="value-display">0.19</span>
+                    </div>
+                    <div class="setting">
+                        <label for="fogRegenRate">Regeneration Rate:</label>
+                        <input type="range" id="fogRegenRate" min="0.0001" max="0.001" step="0.0001" value="0.0006">
+                        <span class="value-display">0.0006</span>
+                    </div>
+                    <div class="setting">
+                        <label for="cellSize">Fog Resolution (Experimental):</label>
+                        <input type="range" id="cellSize" min="2" max="10" step="1" value="3">
+                        <span class="value-display">3</span>
+                        <div class="warning-text">Warning: Lower values may impact performance</div>
+                    </div>
                 </div>
             </div>
             
             <div class="settings-group">
-                <h4>Physics</h4>
-                <div class="setting">
-                    <label for="baseSpeed">Base Speed:</label>
-                    <input type="range" id="baseSpeed" min="0.01" max="0.5" step="0.01" value="0.05">
-                    <span class="value-display">0.05</span>
+                <h4 class="group-header">Raindrops</h4>
+                <div class="settings-group-content" style="display: none;">
+                    <div class="setting">
+                        <label for="dropOpacity">Opacity:</label>
+                        <input type="range" id="dropOpacity" min="0" max="1" step="0.01" value="0.16">
+                        <span class="value-display">0.16</span>
+                    </div>
+                    <div class="setting">
+                        <label for="trailOpacityRatio">Trail Opacity:</label>
+                        <input type="range" id="trailOpacityRatio" min="0" max="1" step="0.05" value="0.7">
+                        <span class="value-display">0.7</span>
+                    </div>
+                    <div class="setting">
+                        <label for="trailBlur">Trail Blur:</label>
+                        <input type="range" id="trailBlur" min="0" max="1" step="0.05" value="0.5">
+                        <span class="value-display">0.5</span>
+                    </div>
+                    <div class="setting">
+                        <label for="trailFadeSpeed">Trail Fade Speed:</label>
+                        <input type="range" id="trailFadeSpeed" min="0.01" max="0.5" step="0.01" value="0.18">
+                        <span class="value-display">0.18</span>
+                    </div>
+                    <div class="setting">
+                        <label for="endTrailFadeSpeed">End Trail Fade Speed:</label>
+                        <input type="range" id="endTrailFadeSpeed" min="0.7" max="0.99" step="0.01" value="0.9">
+                        <span class="value-display">0.9</span>
+                    </div>
+                    <div class="setting">
+                        <label for="dropSpawnRate">Spawn Rate:</label>
+                        <input type="range" id="dropSpawnRate" min="0.1" max="2" step="0.1" value="0.5">
+                        <span class="value-display">0.5</span>
+                    </div>
+                    <div class="setting">
+                        <label for="dropMaxCount">Max Count:</label>
+                        <input type="range" id="dropMaxCount" min="10" max="200" step="10" value="50">
+                        <span class="value-display">50</span>
+                    </div>
+                    <div class="setting">
+                        <label for="dropSizeMin">Min Size:</label>
+                        <input type="range" id="dropSizeMin" min="0.5" max="5" step="0.5" value="2">
+                        <span class="value-display">2</span>
+                    </div>
+                    <div class="setting">
+                        <label for="minActiveSize">Min Active Size:</label>
+                        <input type="range" id="minActiveSize" min="0.1" max="2" step="0.1" value="0.6">
+                        <span class="value-display">0.6</span>
+                        <div class="warning-text">Drops smaller than this will stop moving and fade</div>
+                    </div>
+                    <div class="setting">
+                        <label for="dropSizeMax">Max Size:</label>
+                        <input type="range" id="dropSizeMax" min="1" max="10" step="0.5" value="6">
+                        <span class="value-display">6</span>
+                    </div>
                 </div>
-                <div class="setting">
-                    <label for="weightLossRate">Weight Loss Rate:</label>
-                    <input type="range" id="weightLossRate" min="0.0001" max="0.01" step="0.0001" value="0.0005">
-                    <span class="value-display">0.0005</span>
+            </div>
+            
+            <div class="settings-group">
+                <h4 class="group-header">Visual Effects</h4>
+                <div class="settings-group-content" style="display: none;">
+                    <div class="setting checkbox-setting">
+                        <label for="enableRefraction">Light Refraction:</label>
+                        <input type="checkbox" id="enableRefraction">
+                        <div class="warning-text">May impact performance</div>
+                    </div>
+                    <div class="setting checkbox-setting">
+                        <label for="enableSurfaceTension">Dynamic Surface Tension:</label>
+                        <input type="checkbox" id="enableSurfaceTension">
+                    </div>
+                    <div class="setting">
+                        <label for="surfaceTensionFactor">Surface Tension Strength:</label>
+                        <input type="range" id="surfaceTensionFactor" min="0.1" max="1" step="0.05" value="0.7">
+                        <span class="value-display">0.7</span>
+                        <div class="info-text">Higher values = more circular shapes</div>
+                    </div>
+                    <div class="setting">
+                        <label for="rotationDamping">Rotation Damping:</label>
+                        <input type="range" id="rotationDamping" min="0" max="1" step="0.05" value="0.7">
+                        <span class="value-display">0.7</span>
+                        <div class="info-text">Higher values reduce drop rotation</div>
+                    </div>
+                    <div class="setting">
+                        <label for="bottomWeighting">Bottom Weighting:</label>
+                        <input type="range" id="bottomWeighting" min="0" max="1" step="0.05" value="0.3">
+                        <span class="value-display">0.3</span>
+                        <div class="info-text">Elongates drops at the bottom</div>
+                    </div>
                 </div>
-                <div class="setting">
-                    <label for="massGainRate">Fog Mass Gain:</label>
-                    <input type="range" id="massGainRate" min="0" max="0.001" step="0.00001" value="0.00015">
-                    <span class="value-display">0.00015</span>
+            </div>
+            
+            <div class="settings-group">
+                <h4 class="group-header">Physics</h4>
+                <div class="settings-group-content" style="display: none;">
+                    <div class="setting">
+                        <label for="baseSpeed">Base Speed:</label>
+                        <input type="range" id="baseSpeed" min="0.01" max="0.5" step="0.01" value="0.05">
+                        <span class="value-display">0.05</span>
+                    </div>
+                    <div class="setting">
+                        <label for="weightLossRate">Weight Loss Rate:</label>
+                        <input type="range" id="weightLossRate" min="0.0001" max="0.01" step="0.0001" value="0.0005">
+                        <span class="value-display">0.0005</span>
+                    </div>
+                    <div class="setting">
+                        <label for="massGainRate">Fog Mass Gain:</label>
+                        <input type="range" id="massGainRate" min="0" max="0.001" step="0.00001" value="0.00015">
+                        <span class="value-display">0.00015</span>
+                    </div>
+                    <div class="setting">
+                        <label for="collisionDistance">Collision Distance:</label>
+                        <input type="range" id="collisionDistance" min="0.8" max="2" step="0.05" value="1.2">
+                        <span class="value-display">1.2</span>
+                        <div class="info-text">How easily drops combine (higher = more easily)</div>
+                    </div>
                 </div>
             </div>
             
