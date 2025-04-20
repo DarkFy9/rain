@@ -71,8 +71,8 @@
                 </div>
                 <div class="setting">
                     <label for="cellSize">Fog Resolution (Experimental):</label>
-                    <input type="range" id="cellSize" min="2" max="10" step="1" value="4">
-                    <span class="value-display">4</span>
+                    <input type="range" id="cellSize" min="2" max="10" step="1" value="3">
+                    <span class="value-display">3</span>
                     <div class="warning-text">Warning: Lower values may impact performance</div>
                 </div>
             </div>
@@ -83,6 +83,11 @@
                     <label for="dropOpacity">Opacity:</label>
                     <input type="range" id="dropOpacity" min="0" max="1" step="0.01" value="0.16">
                     <span class="value-display">0.16</span>
+                </div>
+                <div class="setting">
+                    <label for="trailFadeSpeed">Trail Fade Speed:</label>
+                    <input type="range" id="trailFadeSpeed" min="0.01" max="0.5" step="0.01" value="0.1">
+                    <span class="value-display">0.1</span>
                 </div>
                 <div class="setting">
                     <label for="dropSpawnRate">Spawn Rate:</label>
@@ -98,6 +103,12 @@
                     <label for="dropSizeMin">Min Size:</label>
                     <input type="range" id="dropSizeMin" min="0.5" max="5" step="0.5" value="2">
                     <span class="value-display">2</span>
+                </div>
+                <div class="setting">
+                    <label for="minActiveSize">Min Active Size:</label>
+                    <input type="range" id="minActiveSize" min="0.1" max="2" step="0.1" value="0.6">
+                    <span class="value-display">0.6</span>
+                    <div class="warning-text">Drops smaller than this will stop moving and fade</div>
                 </div>
                 <div class="setting">
                     <label for="dropSizeMax">Max Size:</label>

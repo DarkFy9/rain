@@ -29,8 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
             weightLossRate: 0.0005,
             massGainRate: 0.00015,
             musicVolume: 0.5,
-            cellSize: 4, // Added fog resolution (cell size)
-            frameColor: "#8B5A2B" // Default frame color
+            cellSize: 3, // Fog resolution (cell size)
+            frameColor: "#5D4037", // Default frame color
+            trailFadeSpeed: 0.1, // Speed at which stagnant trails fade (0-1)
+            minActiveSize: 0.6 // Minimum size for a drop to remain active while falling
         },
         
         // Current settings (initially set to defaults)
@@ -214,6 +216,36 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.filter = 'blur(2px)';
             ctx.drawImage(offCanvas, 0, 0);
             ctx.filter = 'none';
+        },
+        
+        // Add fog to a specific position
+        addFog: function(x, y, radius, amount) {
+            const cellSize = settings.current.cellSize;
+            const col = Math.floor(x / cellSize);
+            const row = Math.floor(y / cellSize);
+            const radiusCells = Math.ceil(radius / cellSize);
+            
+            // Affect a circular area around the position
+            for (let r = -radiusCells; r <= radiusCells; r++) {
+                for (let c = -radiusCells; c <= radiusCells; c++) {
+                    const currentRow = row + r;
+                    const currentCol = col + c;
+                    
+                    // Skip if outside the canvas
+                    if (currentRow < 0 || currentRow >= this.cells.length || 
+                        currentCol < 0 || currentCol >= this.cells[0].length) {
+                        continue;
+                    }
+                    
+                    // Calculate distance from center (for circular effect)
+                    const distance = Math.sqrt(r*r + c*c);
+                    if (distance <= radiusCells) {
+                        // Reduce opacity more at center, less at edges
+                        const reduction = amount * (1 - distance / radiusCells);
+                        this.cells[currentRow][currentCol] = Math.min(1.0, this.cells[currentRow][currentCol] + reduction);
+                    }
+                }
+            }
         }
     };
     
@@ -250,16 +282,38 @@ document.addEventListener('DOMContentLoaded', () => {
             this.canBeStuck = Math.random() > 0.7; // Make fewer drops able to get stuck
             // Track weight loss - base rate plus factor proportional to size
             this.baseLossRate = settings.current.weightLossRate + Math.random() * 0.01;
-            this.minSize = 0.8; // Minimum size before drop stops
+            this.minSize = settings.current.minActiveSize; // Minimum size before drop stops
             this.lastMomentumUpdate = 0;
             this.momentumUpdateInterval = Math.floor(Math.random() * 30) + 20; // Random intervals for momentum changes
             this.sizeMoveThreshold = 3.5; // Size threshold for large drops to start moving
             this.stoppedTime = 0; // Track how long a drop has been stopped
             this.massGainRate = settings.current.massGainRate; // Rate at which drops gain mass from fog
+            this.reachedBoundary = false; // Flag to indicate if drop has reached the boundary
+            this.isFading = false; // Flag to indicate if drop is in fading phase
         }
         
         update() {
             if (!this.active) return;
+            
+            // Check if drop is now too small to remain active while falling
+            if (this.moving && this.size < this.minSize && !this.isFading) {
+                this.isFading = true;
+                this.moving = false;
+                this.opacity = settings.current.fogOpacity; // Set opacity to fog opacity
+                return;
+            }
+            
+            // Handle fading drops (either too small or reached boundary)
+            if (this.isFading) {
+                // Fade trail faster
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 3) {
+                    const lostTrail = this.trail.pop();
+                    fogMap.addFog(lostTrail.x, lostTrail.y, this.size, 0.02);
+                } else if (this.trail.length === 0) {
+                    this.active = false; // Deactivate once trail is gone
+                }
+                return;
+            }
             
             // // Give initial velocity to drops at the top of the screen
             // if (this.y < 5 && !this.moving) {
@@ -280,6 +334,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         //this.stoppedTime = 0;
                     }
                 }
+                
+                // When stuck, slowly dissipate trails into fog
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 2) {
+                    const lostTrail = this.trail.pop();
+                    // Add to fog where the trail disappeared
+                    fogMap.addFog(lostTrail.x, lostTrail.y, this.size * 0.5, 0.01);
+                }
+                
                 return;
             }
             
@@ -303,23 +365,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 
-                // // Check if fog around the drop has accumulated enough to start moving
-                // const fogDensity = fogMap.getDensityAt(this.x, this.y);
-                // if (fogDensity > 0.7 && Math.random() < 0.01) {
-                //     // Gain mass from accumulated fog and start moving again
-                //     this.size += 0.3;
-                //     this.mass = Math.PI * this.size * this.size;
-                //     this.speed = this.baseSpeed;
-                //     this.moving = true;
-                //     this.stoppedTime = 0;
-                // }
+                // Slowly dissipate trails from non-moving drops into fog
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed) {
+                    const lostTrail = this.trail.pop();
+                    // Add to fog where the trail disappeared
+                    fogMap.addFog(lostTrail.x, lostTrail.y, this.size * 0.5, 0.01);
+                }
                 
                 return;
             }
             
             // Check if drop has lost too much mass or momentum to continue moving
             if (this.moving && 
-                ((this.size <= this.minSize) || (Math.abs(this.speed) < this.momentumThreshold))) {
+                (Math.abs(this.speed) < this.momentumThreshold)) {
                 this.moving = false;
                 //this.stoppedTime = 0;
                 this.speed = 0;
@@ -329,15 +387,17 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add current position to trail
             this.trail.unshift({x: this.x, y: this.y});
             
-            // Limit trail length
+            // Limit trail length and add to fog when trails disappear
             if (this.trail.length > this.maxTrailLength) {
-                this.trail.pop();
+                const lostTrail = this.trail.pop();
+                // Add a small amount of fog where the trail disappeared
+                fogMap.addFog(lostTrail.x, lostTrail.y, this.size, 0.02);
             }
             
             // Lose size/weight as it moves (leaving water behind) - proportional to size
             const weightLossRate = this.baseLossRate * this.size;
             const previousSize = this.size;
-            this.size = Math.max(this.minSize, this.size - weightLossRate);
+            this.size = Math.max(0.1, this.size - weightLossRate);
             
             // Lose speed proportional to mass loss
             if (previousSize > this.size) {
@@ -507,7 +567,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // Check if drop hit bottom of screen or sides
                     if (drop.y > canvas.height || drop.x < 0 || drop.x > canvas.width) {
-                        drop.active = false;
+                        // Instead of immediately deactivating, start the fading process
+                        if (!drop.reachedBoundary) {
+                            drop.reachedBoundary = true;
+                            drop.isFading = true;
+                            drop.moving = false;
+                            drop.speed = 0;
+                            drop.xMomentum = 0;
+                            drop.opacity = settings.current.fogOpacity; // Set opacity to fog opacity
+                        }
                     }
                     
                     // Check collisions with other drops
@@ -524,11 +592,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
-            
-            // // Remove inactive drops after they've been stopped for a while
-            // this.raindrops = this.raindrops.filter(drop => 
-            //     drop.active && (!drop.stoppedTime || drop.stoppedTime < 1000)
-            // );
             
             // Remove inactive drops
             this.raindrops = this.raindrops.filter(drop => drop.active);
