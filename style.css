@@ -1,0 +1,218 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    max-width: 800px;
+    padding: 20px;
+    z-index: 10;
+}
+
+.window-frame {
+    background-color: rgba(139, 90, 43, 0.95);
+    border-radius: 5px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border: 10px solid rgba(139, 90, 43, 0.95);
+    position: relative;
+}
+
+.window-glass {
+    width: 100%;
+    height: 70vh;
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
+    background-image: url('background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+#rainCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(200, 220, 240, 0.15);
+}
+
+/* Add subtle window reflections */
+.window-glass::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0) 50%,
+        rgba(255, 255, 255, 0.08) 100%
+    );
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Settings Panel Styles */
+.settings-panel {
+    position: fixed;
+    top: 20px;
+    right: -320px;
+    width: 320px;
+    background-color: rgba(30, 30, 30, 0.85);
+    color: #fff;
+    border-radius: 8px 0 0 8px;
+    box-shadow: -2px 2px 10px rgba(0, 0, 0, 0.3);
+    transition: right 0.3s ease;
+    z-index: 100;
+    max-height: 90vh;
+    display: flex;
+}
+
+.settings-panel.open {
+    right: 0;
+}
+
+.settings-toggle {
+    width: 40px;
+    height: 40px;
+    background-color: rgba(30, 30, 30, 0.85);
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    border-radius: 8px 0 0 8px;
+    cursor: pointer;
+    margin-right: -1px;
+    align-self: flex-start;
+    position: relative;
+    left: -40px;
+    box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.settings-content {
+    padding: 20px;
+    overflow-y: auto;
+    max-height: 80vh;
+    width: 100%;
+}
+
+.settings-group {
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 15px;
+}
+
+.settings-group h4 {
+    margin-bottom: 10px;
+    color: #ddd;
+}
+
+.setting {
+    margin-bottom: 12px;
+}
+
+.setting label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #ccc;
+}
+
+.setting input[type="range"] {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.value-display {
+    font-size: 12px;
+    color: #aaa;
+    float: right;
+}
+
+/* Music Controls */
+.music-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+#musicSelector {
+    width: 100%;
+    padding: 8px;
+    background-color: rgba(50, 50, 50, 0.8);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    font-size: 14px;
+    outline: none;
+}
+
+.music-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#playPauseMusic {
+    background-color: #4d7ea8;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+}
+
+#playPauseMusic:hover {
+    background-color: #3a6d9a;
+}
+
+#volumeControl {
+    flex: 1;
+    accent-color: #4d7ea8;
+}
+
+/* Adjust the settings buttons layout */
+.settings-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+#resetSettings, #refreshSimulation, #saveSettings {
+    background-color: #4d7ea8;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-right: 5px;
+    margin-bottom: 5px;
+    font-size: 14px;
+} 

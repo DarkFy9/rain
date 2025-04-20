@@ -1,0 +1,14 @@
+{
+  "windowOpacity": 0,
+  "fogOpacity": 0.19,
+  "fogRegenRate": 0.0006,
+  "dropOpacity": 0.16,
+  "dropSpawnRate": 0.5,
+  "dropMaxCount": 50,
+  "dropSizeMin": 2,
+  "dropSizeMax": 6,
+  "baseSpeed": 0.05,
+  "weightLossRate": 0.0005,
+  "massGainRate": 0.00015,
+  "musicVolume": 0.5
+}
