@@ -31,8 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
             musicVolume: 0.5,
             cellSize: 3, // Fog resolution (cell size)
             frameColor: "#5D4037", // Default frame color
-            trailFadeSpeed: 0.1, // Speed at which stagnant trails fade (0-1)
-            minActiveSize: 0.6 // Minimum size for a drop to remain active while falling
+            trailFadeSpeed: 0.18, // Speed at which stagnant trails fade (0-1)
+            minActiveSize: 0.6, // Minimum size for a drop to remain active while falling
+            trailOpacityRatio: 0.7 // Opacity of trails relative to the drop (0-1)
         },
         
         // Current settings (initially set to defaults)
@@ -275,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
             this.trail = []; // Store previous positions for trail effect
             this.maxTrailLength = 10 + this.size * 5;
             this.opacity = settings.current.dropOpacity + Math.random() * 0.3;
+            this.originalOpacity = this.opacity; // Store original opacity for trail calculations
             this.active = true;
             this.moving = true; // Whether the drop is moving or stopped
             this.stuckTime = 0;
@@ -299,14 +301,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (this.moving && this.size < this.minSize && !this.isFading) {
                 this.isFading = true;
                 this.moving = false;
+                // Make sure originalOpacity is set if it wasn't already
+                if (!this.originalOpacity) {
+                    this.originalOpacity = this.opacity;
+                }
                 this.opacity = settings.current.fogOpacity; // Set opacity to fog opacity
                 return;
             }
             
             // Handle fading drops (either too small or reached boundary)
             if (this.isFading) {
-                // Fade trail faster
-                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 3) {
+                // Fade trail faster (5x faster than before)
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 15) {
                     const lostTrail = this.trail.pop();
                     fogMap.addFog(lostTrail.x, lostTrail.y, this.size, 0.02);
                 } else if (this.trail.length === 0) {
@@ -314,12 +320,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return;
             }
-            
-            // // Give initial velocity to drops at the top of the screen
-            // if (this.y < 5 && !this.moving) {
-            //     this.moving = true;
-            //     this.speed = this.baseSpeed;
-            // }
             
             // Check if the drop is already stuck in place
             if (this.stuckTime > 0) {
@@ -335,8 +335,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 
-                // When stuck, slowly dissipate trails into fog
-                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 2) {
+                // When stuck, slowly dissipate trails into fog (1.5x faster than before)
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 3) {
                     const lostTrail = this.trail.pop();
                     // Add to fog where the trail disappeared
                     fogMap.addFog(lostTrail.x, lostTrail.y, this.size * 0.5, 0.01);
@@ -365,8 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 
-                // Slowly dissipate trails from non-moving drops into fog
-                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed) {
+                // Slowly dissipate trails from non-moving drops into fog (1.5x faster than before)
+                if (this.trail.length > 0 && Math.random() < settings.current.trailFadeSpeed * 1.5) {
                     const lostTrail = this.trail.pop();
                     // Add to fog where the trail disappeared
                     fogMap.addFog(lostTrail.x, lostTrail.y, this.size * 0.5, 0.01);
@@ -461,7 +461,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (let i = 0; i < this.trail.length - 1; i++) {
                     const point = this.trail[i];
                     const nextPoint = this.trail[i + 1];
-                    const trailOpacity = this.opacity * (1 - i / this.trail.length) * 0.7;
+                    // Use originalOpacity for consistent trail rendering even when drop opacity changes
+                    const baseOpacity = this.isFading ? this.originalOpacity : this.opacity;
+                    const trailOpacity = baseOpacity * (1 - i / this.trail.length) * settings.current.trailOpacityRatio;
                     const width = Math.max(0.1, this.size * (1 - i / this.trail.length) * 0.8);
                     
                     ctx.strokeStyle = `rgba(220, 240, 255, ${trailOpacity})`;
@@ -574,6 +576,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             drop.moving = false;
                             drop.speed = 0;
                             drop.xMomentum = 0;
+                            // Make sure originalOpacity is set if it wasn't already
+                            if (!drop.originalOpacity) {
+                                drop.originalOpacity = drop.opacity;
+                            }
                             drop.opacity = settings.current.fogOpacity; // Set opacity to fog opacity
                         }
                     }
